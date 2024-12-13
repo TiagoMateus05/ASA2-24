@@ -1,10 +1,8 @@
 #include <iostream>
 #include <vector>
 #include <queue>
-#include <climits>
 #include <unordered_map>
 #include <unordered_set>
-#include <fstream>
 
 using namespace std;
 
@@ -16,24 +14,24 @@ Graph metroGraph;
 
 class Information {
     private:
-        int _numEstacoes;
-        int _numLigacoes;
-        int _numLinhas;
+        int _numStations;
+        int _numConnections;
+        int _numLines;
     public:
-        Information(int numEstacoes, int numLigacoes, int numLinhas, ifstream& inputFile);
+        Information(int numEstacoes, int numLigacoes, int numLinhas);
         void addAdj(Graph &graph, int u, int v, int line);
-        void graphConstruct(ifstream& inputFile);
+        void graphConstruct();
         int BFSCalculate(Graph &graph, int u, int v);
         void calculateSolution();
         void printGraph();
 };
 
 
-Information::Information(int numEstacoes, int numLigacoes, int numLinhas, ifstream& inputFile) {
-    _numEstacoes = numEstacoes;
-    _numLigacoes = numLigacoes;
-    _numLinhas = numLinhas;
-    graphConstruct(inputFile);
+Information::Information(int numEstacoes, int numLigacoes, int numLinhas) {
+    _numStations = numEstacoes;
+    _numConnections = numLigacoes;
+    _numLines = numLinhas;
+    graphConstruct();
     calculateSolution();
 }
 
@@ -42,9 +40,10 @@ void Information::addAdj(Graph &graph, int u, int v, int line) {
     graph.adj[v][u].insert(line); //undirected
 }
 
-void Information::graphConstruct(ifstream& inputFile) {
+void Information::graphConstruct() {
     int u, v, line;
-    while (inputFile >> u >> v >> line) {
+    for (int i = 0; i < _numConnections; i++) {
+        cin >> u >> v >> line;
         addAdj(metroGraph, u, v, line);
     }
 }
@@ -68,7 +67,7 @@ int Information::BFSCalculate(Graph &graph, int u, int v) {
 
     while (!queue.empty()) {
         int station, currentLine, lineChanges;
-        std::tie(station, currentLine, lineChanges) = queue.top();
+        tie(station, currentLine, lineChanges) = queue.top();
         queue.pop();
 
         if (station == v) {
@@ -77,12 +76,12 @@ int Information::BFSCalculate(Graph &graph, int u, int v) {
 
         for (auto it = graph.adj[station].begin(); it != graph.adj[station].end(); ++it) {
             int neighbor = it->first;
-            const std::unordered_set<int>& lines = it->second;
+            const unordered_set<int>& lines = it->second;
             for (int line : lines) {
                 int newLineChanges = lineChanges + (line != currentLine ? 1 : 0);
                 if (!visited[neighbor].count(line) || visited[neighbor][line] > newLineChanges) {
                     visited[neighbor][line] = newLineChanges;
-                    queue.push(std::make_tuple(neighbor, line, newLineChanges));
+                    queue.push(make_tuple(neighbor, line, newLineChanges));
                 }
             }
         }
@@ -92,7 +91,7 @@ int Information::BFSCalculate(Graph &graph, int u, int v) {
 }
 
 void Information::calculateSolution() {
-    if (metroGraph.adj.size() != _numEstacoes) {
+    if (static_cast<int>(metroGraph.adj.size()) != _numStations) {
         cout << -1 << endl;
         return;
     }
@@ -137,19 +136,9 @@ int main(int argc, char * argv[]) {
     std::ios::sync_with_stdio(0);
     std::cin.tie(0);
 
-    if (argc != 2) {
-        cerr << "Error opening file: " << argv[1] << endl;
-    }
-
-    std::ifstream inputFile(argv[1]);
-        if (!inputFile) {
-        std::cerr << "Error opening file: " << argv[1] << std::endl;
-        return 1;
-    }
-
     int numEstacoes, numLigacoes, numLinhas;
-    inputFile >> numEstacoes >> numLigacoes >> numLinhas;
+    cin >> numEstacoes >> numLigacoes >> numLinhas;
 
-    Information info(numEstacoes, numLigacoes, numLinhas, inputFile);
+    Information info(numEstacoes, numLigacoes, numLinhas);
     return 0;
 }
