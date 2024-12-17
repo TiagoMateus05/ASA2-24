@@ -1,130 +1,111 @@
 #include <iostream>
 #include <vector>
+#include <unordered_set>
 #include <queue>
-#include <utility>
+#include <unordered_map>
 #include <algorithm>
+#include <set>
 
 struct Graph {
-    std::vector<std::vector<int>> _stationsAdj; // Lines at each station
-    std::vector<std::vector<int>> _linesAdj;    // Stations on each line
-    std::vector<std::vector<int>> _lineToLine;  // Precomputed line-to-line adjacency
+    std::vector<std::unordered_set<int>> stationsAdj;  // Adjacent lines for stations
+    std::vector<std::unordered_set<int>> linesAdj;     // Adjacent stations for lines
 };
 
 class Information {
 private:
-    int _numConnections;
-    int _numStations;
-    int _numLines;
-    Graph _metroGraph;
+    int numConnections;
+    int numStations;
+    Graph metroGraph;
+    std::set<int> stationSet; // To handle non-sequential station numbers
 
 public:
     Information(int numStations, int numConnections, int numLines);
     void addAdj(int u, int v, int line);
-    void graphConstruct();
-    void precomputeLineAdj();
+    void buildGraph();
     int BFSCalculate(int start, int target);
     void calculateSolution();
 };
 
 Information::Information(int numStations, int numConnections, int numLines)
-    : _numConnections(numConnections), _numStations(numStations), _numLines(numLines) {
-    _metroGraph._linesAdj.resize(numLines + 1);
-    _metroGraph._stationsAdj.resize(numStations + 1);
-    _metroGraph._lineToLine.resize(numLines + 1);
-    graphConstruct();
-    precomputeLineAdj();
+    : numConnections(numConnections), numStations(numStations) {
+    metroGraph.stationsAdj.resize(numStations + 1);
+    metroGraph.linesAdj.resize(numLines + 1);
+    buildGraph();
     calculateSolution();
 }
 
 void Information::addAdj(int u, int v, int line) {
-    _metroGraph._stationsAdj[u].push_back(line);
-    _metroGraph._stationsAdj[v].push_back(line);
-    _metroGraph._linesAdj[line].push_back(u);
-    _metroGraph._linesAdj[line].push_back(v);
+    // Create bidirectional connections between stations and lines
+    metroGraph.stationsAdj[u].insert(line);
+    metroGraph.stationsAdj[v].insert(line);
+    metroGraph.linesAdj[line].insert(u);
+    metroGraph.linesAdj[line].insert(v);
+    stationSet.insert(u);
+    stationSet.insert(v);
 }
 
-void Information::graphConstruct() {
+void Information::buildGraph() {
     int u, v, line;
-    for (int i = 0; i < _numConnections; i++) {
+    for (int i = 0; i < numConnections; i++) {
         std::cin >> u >> v >> line;
         addAdj(u, v, line);
-    }
-}
-
-void Information::precomputeLineAdj() {
-    // Create line-to-line adjacency by traversing each station's lines
-    for (int station = 1; station <= _numStations; ++station) {
-        const auto& lines = _metroGraph._stationsAdj[station];
-        for (size_t i = 0; i < lines.size(); ++i) {
-            for (size_t j = i + 1; j < lines.size(); ++j) {
-                int line1 = lines[i];
-                int line2 = lines[j];
-                _metroGraph._lineToLine[line1].push_back(line2);
-                _metroGraph._lineToLine[line2].push_back(line1);
-            }
-        }
-    }
-
-    // Remove duplicates in line-to-line adjacency
-    for (int line = 1; line <= _numLines; ++line) {
-        std::vector<int>& adjLines = _metroGraph._lineToLine[line];
-        std::sort(adjLines.begin(), adjLines.end());
-        adjLines.erase(std::unique(adjLines.begin(), adjLines.end()), adjLines.end());
     }
 }
 
 int Information::BFSCalculate(int start, int target) {
     if (start == target) return 0;
 
-    std::vector<bool> visitedStations(_numStations + 1, false);
-    std::vector<bool> visitedLines(_numLines + 1, false);
-    std::queue<std::pair<int, int>> queue; // {station, line changes}
+    std::queue<std::pair<int, int>> q;  // {station, line changes}
+    std::unordered_map<int, bool> visitedStations;
+    std::unordered_map<int, int> visitedLines;
 
-    queue.push(std::make_pair(start, 0));
+    q.push({start, 0});
     visitedStations[start] = true;
 
-    while (!queue.empty()) {
-        std::pair<int, int> current = queue.front();
-        queue.pop();
+    while (!q.empty()) {
+        int currentStation = q.front().first;
+        int lineChanges = q.front().second;
+        q.pop();
 
-        int currentStation = current.first;
-        int lineChanges = current.second;
+        for (int line : metroGraph.stationsAdj[currentStation]) {
+            if (visitedLines.count(line) == 0 || visitedLines[line] > lineChanges) {
+                visitedLines[line] = lineChanges;
 
-        for (int line : _metroGraph._stationsAdj[currentStation]) {
-            if (visitedLines[line]) continue;
-            visitedLines[line] = true;
+                for (int nextStation : metroGraph.linesAdj[line]) {
+                    if (nextStation == target) return lineChanges;
 
-            for (int nextStation : _metroGraph._linesAdj[line]) {
-                if (nextStation == target) return lineChanges;
-                if (!visitedStations[nextStation]) {
-                    visitedStations[nextStation] = true;
-                    queue.push(std::make_pair(nextStation, lineChanges + 1));
+                    if (!visitedStations[nextStation]) {
+                        visitedStations[nextStation] = true;
+                        q.push({nextStation, lineChanges + 1});
+                    }
                 }
             }
         }
     }
-    return -1; // No path found
+
+    return -1;  // No path found
 }
 
 void Information::calculateSolution() {
     auto bfs = [&](int start) {
-        std::vector<int> distances(_numStations + 1, -1);
-        std::queue<int> queue;
-        queue.push(start);
+        std::unordered_map<int, int> distances;
+        std::queue<int> q;
+
+        q.push(start);
         distances[start] = 0;
 
         int farthestStation = start;
         int maxDistance = 0;
 
-        while (!queue.empty()) {
-            int station = queue.front();
-            queue.pop();
+        while (!q.empty()) {
+            int station = q.front();
+            q.pop();
 
-            for (int line : _metroGraph._stationsAdj[station]) {
-                for (int nextStation : _metroGraph._linesAdj[line]) {
-                    if (distances[nextStation] == -1) { // Unvisited
+            for (int line : metroGraph.stationsAdj[station]) {
+                for (int nextStation : metroGraph.linesAdj[line]) {
+                    if (distances.find(nextStation) == distances.end()) { // Unvisited
                         distances[nextStation] = distances[station] + 1;
-                        queue.push(nextStation);
+                        q.push(nextStation);
                         if (distances[nextStation] > maxDistance) {
                             maxDistance = distances[nextStation];
                             farthestStation = nextStation;
@@ -137,24 +118,56 @@ void Information::calculateSolution() {
         return std::make_pair(farthestStation, maxDistance);
     };
 
-    // Perform two BFS traversals
-    std::pair<int, int> result1 = bfs(1);
+    // Perform the first BFS from the first station in the set
+    std::pair<int, int> result1 = bfs(*stationSet.begin());
     int farthestStation = result1.first;
 
+    // Perform the second BFS from the farthest station found in the first BFS
     std::pair<int, int> result2 = bfs(farthestStation);
-    int maxLength = result2.second;
+    int maxLineChanges = result2.second;
 
-    std::cout << maxLength - 1 << std::endl;
+    // Check if all stations are reachable
+    std::unordered_map<int, int> distances;
+    std::queue<int> q;
+    q.push(*stationSet.begin());
+    distances[*stationSet.begin()] = 0;
+
+    while (!q.empty()) {
+        int station = q.front();
+        q.pop();
+
+        for (int line : metroGraph.stationsAdj[station]) {
+            for (int nextStation : metroGraph.linesAdj[line]) {
+                if (distances.find(nextStation) == distances.end()) { // Unvisited
+                    distances[nextStation] = distances[station] + 1;
+                    q.push(nextStation);
+                }
+            }
+        }
+    }
+
+    int num = 0;
+    for (int station : stationSet) {
+        num++;
+        if (distances.find(station) == distances.end()) {
+            std::cout << -1 << std::endl;
+            return;
+        }
+    }
+    if (num != numStations) {
+        std::cout << -1 << std::endl;
+        return;
+    }
+    std::cout << maxLineChanges - 1 << std::endl;
 }
 
 int main() {
-    std::ios::sync_with_stdio(false);
-    std::cin.tie(nullptr);
+    std::ios::sync_with_stdio(0);
+    std::cin.tie(0);
 
     int numStations, numConnections, numLines;
     std::cin >> numStations >> numConnections >> numLines;
 
     Information info(numStations, numConnections, numLines);
-
     return 0;
 }
