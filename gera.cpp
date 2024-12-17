@@ -54,7 +54,7 @@ int main(int argc, char* argv[]) {
 
     //-------------------------------------------------------------------------
     mt19937 rng(seed);
-    map<int, set<int>> lineStations;
+    map<int, set<int> > lineStations;
     vector<int> vAllVs = vector<int>(V);
     for (int i = 0; i < V; ++i) vAllVs[i] = i+1;
 
