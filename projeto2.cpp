@@ -6,23 +6,8 @@
 #include <algorithm>
 #include <set>
 
-// Custom hash function for std::pair<int, int>
-struct pair_hash {
-    template <class T1, class T2>
-    std::size_t operator() (const std::pair<T1, T2> &pair) const {
-        return std::hash<T1>()(pair.first) ^ std::hash<T2>()(pair.second);
-    }
-};
-
-// Custom equality function for std::pair<int, int>
-struct pair_equal {
-    bool operator() (const std::pair<int, int> &lhs, const std::pair<int, int> &rhs) const {
-        return lhs.first == rhs.first && lhs.second == rhs.second;
-    }
-};
-
 struct Graphs {
-    std::vector<std::unordered_set<std::pair<int, int>, pair_hash, pair_equal>> metroGraph; // represents the full metro system
+    std::vector<std::unordered_set<int>> metroGraph; // represents the full metro system
     std::vector<std::unordered_set<int>> linesGraph; // represents the full metro system
     std::vector<std::unordered_set<int>> linesByStation;
     std::vector<std::unordered_set<int>> stationsByLine;
@@ -41,18 +26,25 @@ public:
     Information(int numStations, int numConnections, int numLines);
     void addAdj(int u, int v, int line);
     void buildMetroGraph();
-    void printMetroGraph();
     bool isolatedStationsExist();
     bool systemBFS();
-    void printLinesGraph();
     void checkContainedLines();
     int resultsBFS();
+
+    //Debugging
+    void printLinesGraph();
+    void printMetroGraph();
+    void printLinesByStation();
 
     int getSolution() const;
 };
 
 Information::Information(int numStations, int numConnections, int numLines)
     : numConnections(numConnections), numStations(numStations), numLines(numLines) {
+        if (numStations == 1){
+            solution = 0;
+            return;
+        }
         graphs.metroGraph.resize(numStations + 1);
         graphs.linesGraph.resize(numLines + 1);
         graphs.linesByStation.resize(numStations + 1);
@@ -80,19 +72,32 @@ int Information::getSolution() const{
 }
 
 void Information::addAdj(int u, int v, int line) {
-    graphs.metroGraph[u].insert({v,line});
-    graphs.metroGraph[v].insert({u,line});
+    graphs.metroGraph[u].insert(v);
+    graphs.metroGraph[v].insert(u);
+}
+
+void Information::printLinesByStation(){
+    for (int i = 1; i <= numStations; i++){
+        std::cout << "Station " << i << " is in lines: ";
+        for (int line : graphs.linesByStation[i]){
+            std::cout << line << " ";
+        }
+        std::cout << "\n";
+    }
 }
 
 void Information::buildMetroGraph() {
     int u, v, line;
+    //printMetroGraph();
     for (int i = 0; i < numConnections; i++) {
         std::cin >> u >> v >> line;
+        //std::cout << "\nU: " << u << " V: " << v << " Line: " << line << "\n";
         addAdj(u, v, line);
         graphs.linesByStation[u].insert(line);
         graphs.linesByStation[v].insert(line);
         graphs.stationsByLine[line].insert(u);
         graphs.stationsByLine[line].insert(v);
+        //printMetroGraph();
     }
 }
 
@@ -101,8 +106,8 @@ void Information::printMetroGraph() {
     std::cout << "Graph representation:\n";
     for (int station = 1; station <= numStations; ++station) {
         std::cout << "Station " << station << " is connected to stations: ";
-        for (std::pair<int,int> station : graphs.metroGraph[station]) {
-            std::cout << station.first << " ";
+        for (int station : graphs.metroGraph[station]) {
+            std::cout << station << " ";
         }
         std::cout << "\n";
     }
@@ -130,6 +135,8 @@ bool Information::isolatedStationsExist() {
 
 bool Information::systemBFS(){
 
+    //printLinesByStation();
+
     std::vector<int> visited(numStations + 1, 0);
     std::queue<int> q;
     q.push(1);
@@ -137,18 +144,18 @@ bool Information::systemBFS(){
     while (!q.empty()){
         int station = q.front();
         q.pop();
-        for (std::pair<int,int> adjStation : graphs.metroGraph[station]){
-            if (!visited[adjStation.first]){
-                visited[adjStation.first] = 1;
-                q.push(adjStation.first);
-            }
-            for (int line : graphs.linesByStation[station]){
-                for (int adjLine : graphs.linesByStation[adjStation.first]){
-                    if (line != adjLine && !graphs.lineContainedInAnotherLine[adjLine] && !graphs.lineContainedInAnotherLine[line]){
-                        graphs.linesGraph[line].insert(adjLine);
-                        graphs.linesGraph[adjLine].insert(line);
-                    }
+        for (int line1 : graphs.linesByStation[station]){
+            for (int line2 : graphs.linesByStation[station]){
+                if (line1 != line2 && !graphs.lineContainedInAnotherLine[line1] && !graphs.lineContainedInAnotherLine[line2]){
+                    graphs.linesGraph[line1].insert(line2);
+                    graphs.linesGraph[line2].insert(line1);
                 }
+            }
+        }
+        for (int adjStation : graphs.metroGraph[station]){
+            if (!visited[adjStation]){
+                visited[adjStation] = 1;
+                q.push(adjStation);
             }
         }
     }
