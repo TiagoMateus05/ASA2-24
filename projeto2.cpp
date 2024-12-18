@@ -206,7 +206,7 @@ void Information::checkContainedLines(){
     for (int i = 1; i <= numLines; i++){
         for (int j = 1; j <= numLines; j++){
             if (i != j){
-                if (graphs.stationsByLine[i].size() < graphs.stationsByLine[j].size()){
+                if (graphs.stationsByLine[i].size() <= graphs.stationsByLine[j].size()){
                     bool contained = true;
                     for (int station : graphs.stationsByLine[i]){
                         if (graphs.stationsByLine[j].find(station) == graphs.stationsByLine[j].end()){
@@ -214,7 +214,7 @@ void Information::checkContainedLines(){
                             break;
                         }
                     }
-                    if (contained){
+                    if (contained && !graphs.lineContainedInAnotherLine[j]){
                         graphs.lineContainedInAnotherLine[i] = true;
                         break;
                     }
